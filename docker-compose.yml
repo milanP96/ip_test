@@ -1,0 +1,55 @@
+version: "3"
+volumes:
+  backend:
+  pgdata:
+services:
+  backend: &backend
+    build:
+      context: .
+      dockerfile: docker/dev/python/Dockerfile
+    volumes:
+      - ./backend:/backend
+    depends_on: 
+      - redis
+      - postgres
+    ports:
+      - 5000:5000
+    environment:
+      FLASK_ENV: development
+    command: python app.py
+  redis:
+    image: "redis:alpine"
+    ports:
+      - 6379:6379
+  celery_worker:
+    <<: *backend
+    command: celery -A app.client worker --loglevel=info
+    ports: []
+    depends_on: 
+      - redis
+      - postgres
+  front:
+    build:
+      context: .
+      dockerfile: docker/dev/front/Dockerfile
+    working_dir: /src
+    volumes:
+      - ./front:/src
+    ports:
+      - 8080:8080
+    tty: true
+    environment:
+      HOST: 0.0.0.0
+    command: bash -c "npm run serve"
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER: test
+      POSTGRES_DB: test
+      POSTGRES_PASS: test
+      POSTGRES_HOST_AUTH_METHOD: trust
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - 5434:5432
+    restart: unless-stopped
