@@ -101,13 +101,10 @@ def jobs():
 
 @app.route('/job/<int:job_id>', methods=['GET'])
 def get_job(job_id):
-    try:
-        job = Job.query.get_or_404(job_id)
-        resp = JobSerializer(job).serialize()
-        percentage = '100' if job.status != 'process' else cache.get(f'job_{job_id}')
-        resp['percentage'] = percentage
-    except Exception as e:
-        print(e, "LLLL")
+    job = Job.query.get_or_404(job_id)
+    resp = JobSerializer(job).serialize()
+    percentage = '100' if job.status != 'process' else cache.get(f'job_{job_id}')
+    resp['percentage'] = percentage
     return jsonify(resp)
 
 if __name__ == '__main__':
