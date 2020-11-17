@@ -1,8 +1,9 @@
 import ipaddress
 import re
+import socket
 
 from celery import Celery
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, Response
 from flask_caching import Cache
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
@@ -35,6 +36,7 @@ db = SQLAlchemy(app)
 
 from sqlalchemy.dialects.postgresql import ARRAY
 
+
 #  TODO: move models out of app.py
 class Job(db.Model):
     __tablename__ = 'jobs'
@@ -46,9 +48,12 @@ class Job(db.Model):
     search_expression = db.Column(db.String)
     ips_resolved = db.Column(db.Integer, default=0)
     ips_matched = db.Column(db.Integer, default=0)
+    ips_received = db.Column(db.Integer, default=0)
+
 
 def _percentage(part, whole):
-  return 100 * float(part)/float(whole)
+    return 100 * float(part) / float(whole)
+
 
 @client.task
 def resolve_ip(job_id, value, search_expression):
@@ -56,31 +61,41 @@ def resolve_ip(job_id, value, search_expression):
     cache.set(f'job_{job_id}', str(0))
     try:
         ip_address = [str(ip) for ip in ipaddress.IPv4Network(value)]
-        job.ips_resolved = len(ip_address)
+        job.ips_received = len(ip_address)
         filtered_ips = list()
-        filtered_list = list(filter(lambda x: re.search(search_expression, x), ip_address))[:1000]
 
-        for ip in filtered_list:
-            #  First 1000 elements what is accepted by search expression
+        i = 0
+        matched_count = 0
+        resolved_count = 0
+        while matched_count < 1000 and i < len(ip_address):
+            try:
+                resolved_ip = socket.gethostbyaddr(ip_address[i])
+                resolved_count += 1
 
-            #  Uncomment this line to simulate long request
-            # import time
-            # time.sleep(2)
-            filtered_ips.append(ip)
-            job.ips = filtered_ips
-            cache.set(f'job_{job_id}', str(round(_percentage(len(filtered_ips), len(filtered_list)), 2)))
-
+                if re.search(search_expression, resolved_ip[0]) or re.search(search_expression, resolved_ip[2][0]):
+                    matched_count += 1
+                    filtered_ips.append(f'{resolved_ip[0]}-{resolved_ip[2][0]}')
+                    job.ips = filtered_ips
+            except Exception as e:
+                continue
+            cache.set(f'job_{job_id}', str(round(_percentage(i, len(ip_address)), 2)))
+            i += 1
+        job.ips_resolved = resolved_count
         job.status = 'done'
-        job.ips_matched = len(filtered_list)
+        job.ips_matched = matched_count
     except Exception as e:
         job.status = 'error'
 
     db.session.add(job)
     db.session.commit()
 
+
 @app.route('/job', methods=['POST'])
 def create_job():
     data = request.get_json()
+
+    if not data['search_expression'] or not data['value']:
+        return Response('Expected data not provided', 417)
 
     job = Job(
         ips=list(),
@@ -95,9 +110,11 @@ def create_job():
 
     return jsonify({"new_job": JobSerializer(job).serialize()})
 
+
 @app.route('/jobs', methods=['GET'])
 def jobs():
     return jsonify([JobSerializer(job).serialize() for job in Job.query.order_by(Job.id).all()])
+
 
 @app.route('/job/<int:job_id>', methods=['GET'])
 def get_job(job_id):
@@ -106,6 +123,7 @@ def get_job(job_id):
     percentage = '100' if job.status != 'process' else cache.get(f'job_{job_id}')
     resp['percentage'] = percentage
     return jsonify(resp)
+
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0')

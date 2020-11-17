@@ -9,7 +9,7 @@ class JobSerializer:
         self.search_expression = sqlalchemy_obj.search_expression
         self.ips_resolved = sqlalchemy_obj.ips_resolved
         self.ips_matched = sqlalchemy_obj.ips_matched
-        self.job = sqlalchemy_obj
+        self.ips_received = sqlalchemy_obj.ips_received
 
     def serialize(self):
         return {
@@ -20,4 +20,5 @@ class JobSerializer:
             "search_expression": self.search_expression,
             "ips_resolved": self.ips_resolved,
             "ips_matched": self.ips_matched,
+            "ips_received": self.ips_received
         }

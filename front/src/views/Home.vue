@@ -55,9 +55,10 @@
       <h2
         class="mt-6 text-center text-3xl leading-9 font-extrabold text-gray-900"
       >
-        Last job
+        Last jobs
       </h2>
       <p class="text-center">Refresh for new job status</p>
+      <p class="text-center">Click on job to see more details</p>
       <div v-for="(job, i) in jobs" :key="i" class="text-center">
         <router-link class="text-center hover:text-red-500" :to="`/job/${job.id}`">
           <span class="m-4">{{ job.id }}</span>

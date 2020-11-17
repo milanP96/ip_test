@@ -32,6 +32,10 @@
       </p>
       <div v-if="job.status != 'process'">
         <p>
+          IPs received:
+          <span class="font-normal text-gray-700">{{ job.ips_received }}</span>
+        </p>
+        <p>
           IPs resolved:
           <span class="font-normal text-gray-700">{{ job.ips_resolved }}</span>
         </p>
